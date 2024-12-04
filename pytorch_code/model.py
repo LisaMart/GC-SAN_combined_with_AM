@@ -1,10 +1,5 @@
 #!/usr/bin/env python36
 # -*- coding: utf-8 -*-
-"""
-Created on July, 2018
-
-@author: Tangrizzly
-"""
 
 import datetime
 import math
@@ -57,7 +52,6 @@ class PositionEmbedding(nn.Module):
             self.num_embeddings, self.embedding_dim, self.mode,
         )
 
-
 class Residual(Module):
     def __init__(self):
         super().__init__()
@@ -76,7 +70,6 @@ class Residual(Module):
             x = self.d2(x)
         out = residual + x
         return out
-
 
 class MultiHeadedAttention(nn.Module):
     """Multi-Head Attention layer
@@ -132,7 +125,6 @@ class MultiHeadedAttention(nn.Module):
         x = x.transpose(1, 2).contiguous().view(n_batch, -1, self.h * self.d_k)  # (batch, time1, d_model)
         return self.linear_out(x)  # (batch, time1, d_model)
 
-
 class GNN(Module):
     def __init__(self, hidden_size, step=1):
         super(GNN, self).__init__()
@@ -187,7 +179,6 @@ class SessionGraph(Module):
         self.linear_transform = nn.Linear(self.hidden_size * 2, self.hidden_size, bias=True)
         self.rn = Residual()
         self.multihead_attn = nn.MultiheadAttention(self.hidden_size, 1).cuda()
-        # self.multihead_attn = MultiHeadedAttention(4, self.hidden_size, 0.2).cuda()
         self.pe = PositionEmbedding(len_max, self.hidden_size)
         self.loss_function = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr, weight_decay=opt.l2)
@@ -203,19 +194,14 @@ class SessionGraph(Module):
         ht = hidden[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # batch_size x latent_size
         mask_self = mask.repeat(1, mask.shape[1]).view(-1, mask.shape[1], mask.shape[1])
         if self_att:
-            # 加上 self attention
             attn_output = hidden
             for k in range(k_blocks):
                 attn_output = attn_output.transpose(0,1)
                 attn_output, attn_output_weights = self.multihead_attn(attn_output, attn_output, attn_output)
-                # fixme 加上 mask會train壞掉
-                # attn_output = self.multihead_attn(attn_output, attn_output, attn_output, mask_self)  # 加上mask
                 attn_output = attn_output.transpose(0,1)
-                # 加上 residual network
                 if residual:
                     attn_output = self.rn(attn_output)
             hn = attn_output[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # use last one as global interest
-            # a = hn + ht  # consider current interest
             a = 0.52*hn + (1-0.52)*ht  # hyper-parameter w
         else:
             # attention with ht as query
@@ -253,13 +239,9 @@ def forward(model, i, data):
     items = trans_to_cuda(torch.Tensor(items).long())
     A = trans_to_cuda(torch.Tensor(A).float())
     mask = trans_to_cuda(torch.Tensor(mask).long())
-    # summary has an embedding bug - https://github.com/jiangxiluning/pytorch-summary
-    # summary(model, [(items.cpu().numpy().shape), (A.cpu().numpy().shape)])  # print model summary
     hidden = model(items, A)
     get = lambda i: hidden[i][alias_inputs[i]]
     seq_hidden = torch.stack([get(i) for i in torch.arange(len(alias_inputs)).long()])
-    # 加上 position encoding
-    # seq_hidden = model.pe(seq_hidden)
     return targets, model.compute_scores(seq_hidden, mask)
 
 def train_test(model, train_data, test_data):

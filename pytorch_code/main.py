@@ -1,10 +1,5 @@
 #!/usr/bin/env python36
 # -*- coding: utf-8 -*-
-"""
-Created on July, 2018
-
-@author: Tangrizzly
-"""
 
 import argparse
 import pickle
@@ -38,13 +33,9 @@ def main():
     else:
         test_data = pickle.load(open('../datasets/' + opt.dataset + '/test.txt', 'rb'))
 
-    print(f"Размер выборки для тренировки: {len(train_data)}")
-
-    # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
-    # g = build_graph(all_train_seq)
     train_data = Data(train_data, shuffle=True, opt=opt)
     test_data = Data(test_data, shuffle=False, opt=opt)
-    # del all_train_seq, g
+
     if opt.dataset == 'diginetica':
         n_node = 43098
     elif opt.dataset == 'yoochoose1_64' or opt.dataset == 'yoochoose1_4':
@@ -62,7 +53,7 @@ def main():
     bad_counter = 0
     for epoch in range(opt.epoch):
         print('-------------------------------------------------------')
-        print(f'epoch:  {epoch}/{opt.epoch}')
+        print(f'epoch:  {epoch}/{opt.epoch-1}')
         precision_at_k_mean, mrr_mean = train_test(model, train_data, test_data)
         flag = 0
         if precision_at_k_mean >= best_result[0]:
