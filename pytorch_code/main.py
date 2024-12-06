@@ -26,6 +26,9 @@ parser.add_argument('--last_k', type=int, default=7)
 parser.add_argument('--heads', type=int, default=8)
 parser.add_argument('--scale', default=True, help='scaling factor sigma')
 parser.add_argument('--dot', default=True, action='store_true')
+parser.add_argument('--l_p', type=int, default=4, help='Lipschitz norm for attention pooling')
+parser.add_argument('--use_attn_conv', type=str, default="True", help='Whether to use attention convolution')
+
 opt = parser.parse_args()
 print(opt)
 
