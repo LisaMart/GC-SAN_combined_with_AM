@@ -22,6 +22,10 @@ parser.add_argument('--nonhybrid', action='store_true', help='only use the globa
 parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--valid_portion', type=float, default=0.1, help='split the portion of training set as validation set')
 parser.add_argument('--dynamic', type=bool, default=False)
+parser.add_argument('--last_k', type=int, default=7)
+parser.add_argument('--heads', type=int, default=8)
+parser.add_argument('--scale', default=True, help='scaling factor sigma')
+parser.add_argument('--dot', default=True, action='store_true')
 opt = parser.parse_args()
 print(opt)
 

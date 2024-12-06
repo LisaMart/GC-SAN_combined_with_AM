@@ -163,6 +163,68 @@ class GNN(Module):
             hidden = self.GNNCell(A, hidden)
         return hidden
 
+class LastAttenion(nn.Module):
+    def __init__(self, hidden_size, heads, dot, l_p, last_k=3, use_attn_conv=False, area_func=None):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.heads = heads
+        self.last_k = last_k
+        self.linear_zero = nn.Linear(self.hidden_size, self.hidden_size, bias=True)
+        self.linear_one = nn.Linear(self.hidden_size, self.hidden_size, bias=True)
+        self.linear_two = nn.Linear(self.hidden_size, self.hidden_size, bias=True)
+        self.linear_three = nn.Linear(self.hidden_size, self.heads, bias=False)
+        self.linear_four = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.linear_five = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.dropout = 0.1
+        self.dot = dot
+        self.l_p = l_p
+        self.use_attn_conv = use_attn_conv
+        self.ccattn = area_func
+        self.last_layernorm = torch.nn.LayerNorm(hidden_size, eps=1e-8)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for weight in self.parameters():
+            weight.data.normal_(std=0.1)
+
+    def forward(self, ht1, hidden, mask):
+        """
+        Механизм внимания, основанный на scaled dot-product attention.
+
+        :param ht1: Текущий скрытый запрос (batch_size, 1, hidden_size)
+        :param hidden: Скрытые состояния (batch_size, seq_len, hidden_size)
+        :param mask: Маска для значений (batch_size, seq_len) для скрытия определённых значений
+        :return: Обработанное внимание
+        """
+        # Линейные преобразования для создания запросов, ключей и значений
+        q0 = self.linear_zero(ht1).view(-1, ht1.size(1), self.hidden_size // self.heads)
+        q1 = self.linear_one(hidden).view(-1, hidden.size(1), self.hidden_size // self.heads)
+        q2 = self.linear_two(hidden).view(-1, hidden.size(1), self.hidden_size // self.heads)
+
+        # Масштабированное скалярное произведение для вычисления внимания
+        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 1)))  # (batch_size, seq_len, seq_len)
+
+        # Применяем softmax для получения весов внимания
+        alpha = alpha.view(-1, q0.size(1) * self.heads, hidden.size(1)).permute(0, 2, 1)
+        alpha = torch.softmax(2 * alpha, dim=1)  # Применяем softmax по последнему измерению (по ключам)
+
+        # Применяем маску, если она есть
+        if mask is not None:
+            alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
+            alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
+
+        # Применяем Dropout
+        alpha = F.dropout(alpha, p=self.dropout, training=self.training)
+
+        # Вычисляем итоговое значение с использованием значений (v)
+        a = torch.sum(
+            (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
+                hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
+        )
+
+        # Возвращаем итоговое внимание и веса
+        return a, alpha
+
 class SessionGraph(Module):
     def __init__(self, opt, n_node, len_max):
         super(SessionGraph, self).__init__()
@@ -183,6 +245,10 @@ class SessionGraph(Module):
         self.loss_function = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr, weight_decay=opt.l2)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=opt.lr_dc_step, gamma=opt.lr_dc)
+
+        self.last_attention = LastAttenion(self.hidden_size, opt.heads, opt.dot, opt.l_p, last_k=opt.last_k,
+                                           use_attn_conv=opt.use_attn_conv)
+
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -193,18 +259,15 @@ class SessionGraph(Module):
     def compute_scores(self, hidden, mask, self_att=True, residual=True, k_blocks=4):
         ht = hidden[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # batch_size x latent_size
         mask_self = mask.repeat(1, mask.shape[1]).view(-1, mask.shape[1], mask.shape[1])
+
         if self_att:
-            attn_output = hidden
-            for k in range(k_blocks):
-                attn_output = attn_output.transpose(0,1)
-                attn_output, attn_output_weights = self.multihead_attn(attn_output, attn_output, attn_output)
-                attn_output = attn_output.transpose(0,1)
-                if residual:
-                    attn_output = self.rn(attn_output)
-            hn = attn_output[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # use last one as global interest
-            a = 0.52*hn + (1-0.52)*ht  # hyper-parameter w
+            # Используем LastAttention для вычисления внимания
+            attn_output, attn_weights = self.last_attention(ht, hidden, mask)
+            hn = attn_output[
+                torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # use last one as global interest
+            a = 0.52 * hn + (1 - 0.52) * ht  # скомбинированное скрытое состояние
         else:
-            # attention with ht as query
+            # Старый способ внимания (если необходимо)
             q1 = self.linear_one(ht).view(ht.shape[0], 1, ht.shape[1])  # batch_size x 1 x latent_size
             q2 = self.linear_two(hidden)  # batch_size x seq_length x latent_size
             alpha = self.linear_three(torch.sigmoid(q1 + q2))
@@ -218,9 +281,8 @@ class SessionGraph(Module):
 
     def forward(self, inputs, A):
         hidden = self.embedding(inputs)
-        hidden = self.gnn(A, hidden)
+        hidden = self.gnn(A, hidden)  # Применение GNN
         return hidden
-
 def trans_to_cuda(variable):
     if torch.cuda.is_available():
         return variable.cuda()
@@ -233,50 +295,72 @@ def trans_to_cpu(variable):
     else:
         return variable
 
+
 def forward(model, i, data):
     alias_inputs, A, items, mask, targets = data.get_slice(i)
     alias_inputs = trans_to_cuda(torch.Tensor(alias_inputs).long())
     items = trans_to_cuda(torch.Tensor(items).long())
     A = trans_to_cuda(torch.Tensor(A).float())
     mask = trans_to_cuda(torch.Tensor(mask).long())
+
+    # Получаем скрытые состояния с помощью GNN
     hidden = model(items, A)
+
+    # Получаем внимание с помощью LastAttention
     get = lambda i: hidden[i][alias_inputs[i]]
     seq_hidden = torch.stack([get(i) for i in torch.arange(len(alias_inputs)).long()])
+
+    # Возвращаем результат работы compute_scores, учитывая внимание
     return targets, model.compute_scores(seq_hidden, mask)
 
 def train_test(model, train_data, test_data):
+    # Этап обучения
     model.scheduler.step()
     print('start training: ', datetime.datetime.now())
     model.train()
     total_loss = 0.0
     slices = train_data.generate_batch(model.batch_size)
+
     for i, j in zip(slices, np.arange(len(slices))):
         model.optimizer.zero_grad()
-        targets, scores = forward(model, i, train_data)
-        targets = trans_to_cuda(torch.Tensor(targets).long())
-        loss = model.loss_function(scores, targets - 1)
-        loss.backward()
-        model.optimizer.step()
+        targets, scores = forward(model, i, train_data)  # forward() использует LastAttention внутри compute_scores()
+        targets = trans_to_cuda(torch.Tensor(targets).long())  # Переносим targets на GPU
+        loss = model.loss_function(scores, targets - 1)  # Вычисление потерь
+        loss.backward()  # Обратное распространение ошибки
+        model.optimizer.step()  # Шаг оптимизации
         total_loss += loss
+
+        # Выводим информацию о потере каждые 1/5 эпохи
         if j % int(len(slices) / 5 + 1) == 0:
             print('[%d/%d] Loss: %.4f' % (j, len(slices), loss.item()))
+
     print('\tLoss:\t%.3f' % total_loss)
 
+    # Этап предсказания
     print('start predicting: ', datetime.datetime.now())
     model.eval()
     precision, mrr = [], []
     slices = test_data.generate_batch(model.batch_size)
+
     for i in slices:
-        targets, scores = forward(model, i, test_data)
+        targets, scores = forward(model, i, test_data)  # forward() использует LastAttention внутри compute_scores()
+
+        # Получаем топ-K предсказаний
         sub_scores = scores.topk(K)[1]
         sub_scores = trans_to_cpu(sub_scores).detach().numpy()
+
+        # Вычисляем Precision@K и MRR
         for score, target, mask in zip(sub_scores, targets, test_data.mask):
-            precision_at_k = np.isin(target - 1, score).sum() / K # Precision@K
-            precision.append(precision_at_k)  # добавляем в список Precision@K
+            precision_at_k = np.isin(target - 1, score).sum() / K  # Precision@K
+            precision.append(precision_at_k)  # Добавляем в список Precision@K
+
+            # Вычисление MRR (Mean Reciprocal Rank)
             if len(np.where(score == target - 1)[0]) == 0:
                 mrr.append(0)
             else:
                 mrr.append(1 / (np.where(score == target - 1)[0][0] + 1))
+
+    # Среднее значение Precision@K и MRR
     precision_at_k_mean = np.mean(precision) * 100
     mrr_mean = np.mean(mrr) * 100
 
