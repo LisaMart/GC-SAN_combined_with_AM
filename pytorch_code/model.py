@@ -196,6 +196,9 @@ class LastAttenion(nn.Module):
         :param mask: Маска для значений (batch_size, seq_len) для скрытия определённых значений
         :return: Обработанное внимание
         """
+
+        print(f"ht1.shape: {ht1.shape}") # Выводим форму ht1 для отладки
+
         # Линейные преобразования для создания запросов, ключей и значений
         q0 = self.linear_zero(ht1).view(-1, ht1.size(1), self.hidden_size // self.heads)
         q1 = self.linear_one(hidden).view(-1, hidden.size(1), self.hidden_size // self.heads)
