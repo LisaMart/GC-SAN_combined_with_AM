@@ -183,6 +183,9 @@ class LastAttenion(nn.Module):
         self.last_layernorm = torch.nn.LayerNorm(hidden_size, eps=1e-8)
         self.reset_parameters()
 
+        print(f"hidden_size: {self.hidden_size}, heads: {self.heads}")
+        print(f"hidden_size // heads: {self.hidden_size // self.heads}")
+
     def reset_parameters(self):
         for weight in self.parameters():
             weight.data.normal_(std=0.1)
