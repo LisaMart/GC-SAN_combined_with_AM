@@ -208,6 +208,8 @@ class LastAttenion(nn.Module):
         alpha = alpha.view(-1, q0.size(1) * self.heads, hidden.size(1)).permute(0, 2, 1)
         alpha = torch.softmax(2 * alpha, dim=1)  # Применяем softmax по последнему измерению (по ключам)
 
+        print(f"Attention weights: {alpha}")  # Выводим веса внимания DEBUGGING STRING
+
         # Применяем маску, если она есть
         if mask is not None:
             alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
@@ -305,6 +307,7 @@ def forward(model, i, data):
 
     # Получаем скрытые состояния с помощью GNN
     hidden = model(items, A)
+    print(f"Shape of hidden: {hidden.shape}")  # Выводим форму тензора DEBUGGING STRING
 
     # Получаем внимание с помощью LastAttention
     get = lambda i: hidden[i][alias_inputs[i]]
@@ -331,8 +334,11 @@ def train_test(model, train_data, test_data):
         total_loss += loss
 
         # Выводим информацию о потере каждые 1/5 эпохи
-        if j % int(len(slices) / 5 + 1) == 0:
-            print('[%d/%d] Loss: %.4f' % (j, len(slices), loss.item()))
+        #if j % int(len(slices) / 5 + 1) == 0:
+            #print('[%d/%d] Loss: %.4f' % (j, len(slices), loss.item()))
+
+        if j % 10 == 0:  # Выводим каждые 10 шагов DEBUGGING STRING
+            print(f'Epoch: {epoch}, Step: {j}, Loss: {loss.item()}') # DEBUGGING STRING
 
     print('\tLoss:\t%.3f' % total_loss)
 
