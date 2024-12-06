@@ -187,48 +187,46 @@ class LastAttenion(nn.Module):
         for weight in self.parameters():
             weight.data.normal_(std=0.1)
 
-    def forward(self, ht1, hidden, mask):
-        """
-        Механизм внимания, основанный на scaled dot-product attention.
+def forward(self, ht1, hidden, mask):
+    """
+    Механизм внимания, основанный на scaled dot-product attention.
 
-        :param ht1: Текущий скрытый запрос (batch_size, 1, hidden_size)
-        :param hidden: Скрытые состояния (batch_size, seq_len, hidden_size)
-        :param mask: Маска для значений (batch_size, seq_len) для скрытия определённых значений
-        :return: Обработанное внимание
-        """
+    :param ht1: Текущий скрытый запрос (batch_size, 1, hidden_size)
+    :param hidden: Скрытые состояния (batch_size, seq_len, hidden_size)
+    :param mask: Маска для значений (batch_size, seq_len) для скрытия определённых значений
+    :return: Обработанное внимание
+    """
 
-        print(f"ht1.shape: {ht1.shape}") # Выводим форму ht1 для отладки
+    print(f"--- Debugging --- ht1.shape: {ht1.shape}") # Выводим форму ht1 для отладки
 
-        # Линейные преобразования для создания запросов, ключей и значений
-        q0 = self.linear_zero(ht1).view(-1, ht1.size(1), self.hidden_size // self.heads)
-        q1 = self.linear_one(hidden).view(-1, hidden.size(1), self.hidden_size // self.heads)
-        q2 = self.linear_two(hidden).view(-1, hidden.size(1), self.hidden_size // self.heads)
+    # Линейные преобразования для создания запросов, ключей и значений
+    q0 = self.linear_zero(ht1).view(ht1.size(0), ht1.size(1), self.hidden_size // self.heads)
+    q1 = self.linear_one(hidden).view(hidden.size(0), hidden.size(1), self.hidden_size // self.heads)
+    q2 = self.linear_two(hidden).view(hidden.size(0), hidden.size(1), self.hidden_size // self.heads)
 
-        # Масштабированное скалярное произведение для вычисления внимания
-        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 1)))  # (batch_size, seq_len, seq_len)
+    # Масштабированное скалярное произведение для вычисления внимания
+    alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 1)))  # (batch_size, seq_len, seq_len)
 
-        # Применяем softmax для получения весов внимания
-        alpha = alpha.view(-1, q0.size(1) * self.heads, hidden.size(1)).permute(0, 2, 1)
-        alpha = torch.softmax(2 * alpha, dim=1)  # Применяем softmax по последнему измерению (по ключам)
+    # Применяем softmax для получения весов внимания
+    alpha = alpha.view(-1, q0.size(1) * self.heads, hidden.size(1)).permute(0, 2, 1)
+    alpha = torch.softmax(2 * alpha, dim=1)  # Применяем softmax по последнему измерению (по ключам)
 
-        print(f"Attention weights: {alpha}")  # Выводим веса внимания DEBUGGING STRING
+    # Применяем маску, если она есть
+    if mask is not None:
+        alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
+        alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
-        # Применяем маску, если она есть
-        if mask is not None:
-            alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
-            alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
+    # Применяем Dropout
+    alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
-        # Применяем Dropout
-        alpha = F.dropout(alpha, p=self.dropout, training=self.training)
+    # Вычисляем итоговое значение с использованием значений (v)
+    a = torch.sum(
+        (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
+            hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
+    )
 
-        # Вычисляем итоговое значение с использованием значений (v)
-        a = torch.sum(
-            (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
-                hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
-        )
-
-        # Возвращаем итоговое внимание и веса
-        return a, alpha
+    # Возвращаем итоговое внимание и веса
+    return a, alpha
 
 class SessionGraph(Module):
     def __init__(self, opt, n_node, len_max):
@@ -341,7 +339,7 @@ def train_test(model, train_data, test_data):
             #print('[%d/%d] Loss: %.4f' % (j, len(slices), loss.item()))
 
         if j % 10 == 0:  # Выводим каждые 10 шагов DEBUGGING STRING
-            print(f'Epoch: {epoch}, Step: {j}, Loss: {loss.item()}') # DEBUGGING STRING
+            print(f'Step: {j}, Loss: {loss.item()}') # DEBUGGING STRING
 
     print('\tLoss:\t%.3f' % total_loss)
 
