@@ -213,15 +213,17 @@ class LastAttenion(nn.Module):
 
         # Динамическое вычисление для корректного преобразования формы
         q1 = self.linear_one(hidden)
-        print(f"--- Debugging --- q1.shape before view: {q1.shape}")
+        print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
         batch_size, seq_len, _ = q1.size()
         print(f"--- Debugging --- q1.size(): {q1.size()}")
-        q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)  # Приводим к ожидаемой форме
+
+        # Используем reshape для динамического изменения формы
+        q1 = q1.reshape(batch_size, seq_len, self.hidden_size // self.heads)
 
         q2 = self.linear_two(hidden)
         batch_size, seq_len, _ = q2.size()
         print(f"--- Debugging --- Shape of hidden after linear_two: {hidden.shape}")
-        q2 = q2.view(batch_size, seq_len, self.hidden_size // self.heads)  # Приводим к ожидаемой форме
+        q2 = q2.reshape(batch_size, seq_len, self.hidden_size // self.heads)  # Используем reshape вместо view
 
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
@@ -245,13 +247,14 @@ class LastAttenion(nn.Module):
 
         # Вычисляем итоговое значение с использованием значений (v)
         a = torch.sum(
-            (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
+            (alpha.unsqueeze(-1) * q2.reshape(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
                 hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
         )
 
         print(f"--- Debugging --- output a.shape: {a.shape}")
         # Возвращаем итоговое внимание и веса
         return a, alpha
+
 class SessionGraph(Module):
     def __init__(self, opt, n_node, len_max):
         super(SessionGraph, self).__init__()
