@@ -210,7 +210,6 @@ class LastAttenion(nn.Module):
 
         # Линейные преобразования для создания запросов, ключей и значений
         q0 = self.linear_zero(ht1).view(batch_size, -1, self.hidden_size // self.heads)
-        #q1 = self.linear_one(hidden).view(batch_size, seq_len, self.hidden_size // self.heads)
 
         # Динамическое вычисление для корректного преобразования формы
         q1 = self.linear_one(hidden)
