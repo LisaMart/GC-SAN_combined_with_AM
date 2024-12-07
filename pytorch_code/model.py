@@ -211,10 +211,14 @@ class LastAttenion(nn.Module):
         # Линейные преобразования для создания запросов, ключей и значений
         q0 = self.linear_zero(ht1).view(batch_size, -1, self.hidden_size // self.heads)
         #q1 = self.linear_one(hidden).view(batch_size, seq_len, self.hidden_size // self.heads)
+
         # Динамическое вычисление для корректного преобразования формы
         q1 = self.linear_one(hidden)
+        print(f"--- Debugging --- q1.shape before view: {q1.shape}")
         batch_size, seq_len, _ = q1.size()
-        q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)
+        print(f"--- Debugging --- q1.size(): {q1.size()}")
+        q1 = q1.view(batch_size, seq_len, -1)  # Автоматически определяем размерность для последней оси
+
         q2 = self.linear_two(hidden).view(batch_size, seq_len, self.hidden_size // self.heads)
 
         print(f"--- Debugging --- q0.shape: {q0.shape}")
