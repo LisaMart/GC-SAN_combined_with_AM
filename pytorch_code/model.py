@@ -219,7 +219,10 @@ class LastAttenion(nn.Module):
         print(f"--- Debugging --- q1.size(): {q1.size()}")
         q1 = q1.view(batch_size, seq_len, -1)  # Автоматически определяем размерность для последней оси
 
-        q2 = self.linear_two(hidden).view(batch_size, seq_len, self.hidden_size // self.heads)
+        q2 = self.linear_two(hidden)
+        batch_size, seq_len, _ = q2.size()
+        print(f"--- Debugging --- Shape of hidden after linear_two: {hidden.shape}")
+        q2 = q2.view(batch_size, seq_len, -1)  # Автоматически определяем размерность для последней оси
 
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
