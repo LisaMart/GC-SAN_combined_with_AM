@@ -188,9 +188,6 @@ class LastAttenion(nn.Module):
         self.last_layernorm = torch.nn.LayerNorm(hidden_size, eps=1e-8)
         self.reset_parameters()
 
-        print(f"--- Debugging --- hidden_size: {self.hidden_size}, heads: {self.heads}")
-        print(f"--- Debugging --- hidden_size // heads: {self.hidden_size // self.heads}")
-
     def reset_parameters(self):
         for weight in self.parameters():
             weight.data.normal_(std=0.1)
@@ -209,10 +206,12 @@ class LastAttenion(nn.Module):
         print(f"--- Debugging --- hidden.shape: {hidden.shape}")
         print(f"--- Debugging --- mask.shape: {mask.shape}")
 
+        batch_size, seq_len, _ = hidden.size()  # Получаем размерности batch и seq_len
+
         # Линейные преобразования для создания запросов, ключей и значений
-        q0 = self.linear_zero(ht1).view(ht1.size(0), -1, self.hidden_size // self.heads)
-        q1 = self.linear_one(hidden).view(hidden.size(0), hidden.size(1), self.hidden_size // self.heads)
-        q2 = self.linear_two(hidden).view(hidden.size(0), hidden.size(1), self.hidden_size // self.heads)
+        q0 = self.linear_zero(ht1).view(batch_size, 1, self.hidden_size // self.heads)
+        q1 = self.linear_one(hidden).view(batch_size, seq_len, self.hidden_size // self.heads)
+        q2 = self.linear_two(hidden).view(batch_size, seq_len, self.hidden_size // self.heads)
 
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
@@ -223,8 +222,8 @@ class LastAttenion(nn.Module):
         print(f"--- Debugging --- alpha.shape: {alpha.shape}")
 
         # Применяем softmax для получения весов внимания
-        alpha = alpha.view(-1, q0.size(1) * self.heads, hidden.size(1)).permute(0, 2, 1)
-        alpha = torch.softmax(2 * alpha, dim=1)  # Применяем softmax по последнему измерению (по ключам)
+        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len).permute(0, 2, 3, 1)
+        alpha = torch.softmax(2 * alpha, dim=-1)  # Применяем softmax по последнему измерению (по ключам)
 
         # Применяем маску, если она есть
         if mask is not None:
@@ -236,8 +235,8 @@ class LastAttenion(nn.Module):
 
         # Вычисляем итоговое значение с использованием значений (v)
         a = torch.sum(
-            (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
-                hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
+            (alpha.unsqueeze(-1) * q2.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)).view(
+                batch_size, seq_len, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
         )
 
         print(f"--- Debugging --- output a.shape: {a.shape}")
