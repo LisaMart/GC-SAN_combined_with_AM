@@ -211,20 +211,17 @@ class LastAttenion(nn.Module):
         # Линейные преобразования для создания запросов, ключей и значений
         q0 = self.linear_zero(ht1).view(batch_size, -1, self.hidden_size // self.heads)
 
-        # Динамическое вычисление для корректного преобразования формы
+        # Преобразуем q1 и q2 в нужную форму
         q1 = self.linear_one(hidden)
         print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
         batch_size, seq_len, _ = q1.size()
-        print(f"--- Debugging --- q1.size(): {q1.size()}")
-
-        # Используем reshape для динамического изменения формы
-        q1 = q1.reshape(batch_size, seq_len, self.hidden_size // self.heads)
+        q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)  # Используем явное вычисление для размера
 
         q2 = self.linear_two(hidden)
-        batch_size, seq_len, _ = q2.size()
-        print(f"--- Debugging --- Shape of hidden after linear_two: {hidden.shape}")
-        q2 = q2.reshape(batch_size, seq_len, self.hidden_size // self.heads)  # Используем reshape вместо view
+        print(f"--- Debugging --- q2.shape before reshape: {q2.shape}")
+        q2 = q2.view(batch_size, seq_len, self.hidden_size // self.heads)
 
+        # Проверяем формы после преобразования
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
@@ -247,7 +244,7 @@ class LastAttenion(nn.Module):
 
         # Вычисляем итоговое значение с использованием значений (v)
         a = torch.sum(
-            (alpha.unsqueeze(-1) * q2.reshape(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
+            (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
                 hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
         )
 
