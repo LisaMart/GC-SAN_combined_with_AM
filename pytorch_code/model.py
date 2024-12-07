@@ -210,7 +210,7 @@ class LastAttenion(nn.Module):
         print(f"--- Debugging --- mask.shape: {mask.shape}")
 
         # Линейные преобразования для создания запросов, ключей и значений
-        q0 = self.linear_zero(ht1).view(ht1.size(0), ht1.size(1), self.hidden_size // self.heads)
+        q0 = self.linear_zero(ht1).view(ht1.size(0), -1, self.hidden_size // self.heads)
         q1 = self.linear_one(hidden).view(hidden.size(0), hidden.size(1), self.hidden_size // self.heads)
         q2 = self.linear_two(hidden).view(hidden.size(0), hidden.size(1), self.hidden_size // self.heads)
 
