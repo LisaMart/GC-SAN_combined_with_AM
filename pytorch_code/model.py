@@ -28,8 +28,10 @@ class PositionEmbedding(nn.Module):
         self.mode = mode
         if self.mode == self.MODE_EXPAND:
             self.weight = nn.Parameter(torch.Tensor(num_embeddings * 2 + 1, embedding_dim))
+            print(f"--- Debugging --- Shape of self.weight: {self.weight.shape}")  # Выводим форму после инициализации веса
         else:
             self.weight = nn.Parameter(torch.Tensor(num_embeddings, embedding_dim))
+            print(f"--- Debugging --- Shape of self.weight: {self.weight.shape}")  # Выводим форму после инициализации веса
         # self.reset_parameters()
 
     def reset_parameters(self):
@@ -38,6 +40,8 @@ class PositionEmbedding(nn.Module):
     def forward(self, x):
         if self.mode == self.MODE_EXPAND:
             indices = torch.clamp(x, -self.num_embeddings, self.num_embeddings) + self.num_embeddings
+            output = F.embedding(indices.type(torch.LongTensor), self.weight)
+            print(f"--- Debugging --- Shape of output after embedding: {output.shape}")
             return F.embedding(indices.type(torch.LongTensor), self.weight)
         batch_size, seq_len = x.size()[:2]
         embeddings = self.weight[:seq_len, :].view(1, seq_len, self.embedding_dim)
@@ -114,6 +118,7 @@ class MultiHeadedAttention(nn.Module):
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)  # (batch, head, time1, time2)
         if mask is not None:
             mask = mask.unsqueeze(1).eq(0)  # (batch, 1, time1, time2)
+            print(f"--- Debugging --- Shape of mask after unsqueeze and eq: {mask.shape}")
             min_value = float(np.finfo(torch.tensor(0, dtype=scores.dtype).numpy().dtype).min)
             # scores = scores.masked_fill(mask, min_value)
             self.attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
@@ -296,6 +301,7 @@ class SessionGraph(Module):
     def forward(self, inputs, A):
         hidden = self.embedding(inputs)
         hidden = self.gnn(A, hidden)  # Применение GNN
+        print(f"--- Debugging --- Shape of hidden after GNN: {hidden.shape}")
         return hidden
 def trans_to_cuda(variable):
     if torch.cuda.is_available():
@@ -313,6 +319,7 @@ def trans_to_cpu(variable):
 def forward(model, i, data):
     alias_inputs, A, items, mask, targets = data.get_slice(i)
     alias_inputs = trans_to_cuda(torch.Tensor(alias_inputs).long())
+    print(f"--- Debugging --- Shape of alias_inputs after trans_to_cuda: {alias_inputs.shape}")
     items = trans_to_cuda(torch.Tensor(items).long())
     A = trans_to_cuda(torch.Tensor(A).float())
     mask = trans_to_cuda(torch.Tensor(mask).long())
