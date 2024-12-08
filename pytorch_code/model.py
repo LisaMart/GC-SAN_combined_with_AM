@@ -211,19 +211,15 @@ class LastAttenion(nn.Module):
         # Линейные преобразования для создания запросов, ключей и значений
         q0 = self.linear_zero(ht1).view(batch_size, -1, self.hidden_size // self.heads)
 
-        # Динамическое вычисление размера для корректного преобразования формы
+        # Для q1
         q1 = self.linear_one(hidden)
-        print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
         batch_size, seq_len, _ = q1.size()  # Получаем текущие размеры
+        print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
 
-        # Проверяем, что размерность корректна
-        if self.hidden_size % self.heads != 0:
-            raise ValueError("hidden_size должно делиться на количество голов!")
+        # Здесь мы делим на количество голов (heads) и получаем нужную размерность
+        q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)  # Делим по головам
 
-        # Преобразуем форму
-        q1 = q1.view(batch_size, seq_len,
-                     self.hidden_size // self.heads)  # Используем правильное вычисление для последней оси
-
+        # Для q2
         q2 = self.linear_two(hidden)
         print(f"--- Debugging --- q2.shape before reshape: {q2.shape}")
         q2 = q2.view(batch_size, seq_len, self.hidden_size // self.heads)  # Применяем тот же подход для q2
