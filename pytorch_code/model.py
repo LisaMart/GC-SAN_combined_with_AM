@@ -211,15 +211,23 @@ class LastAttenion(nn.Module):
         # Линейные преобразования для создания запросов, ключей и значений
         q0 = self.linear_zero(ht1).view(batch_size, -1, self.hidden_size // self.heads)
 
-        # Преобразуем q1 и q2 в нужную форму
+        # Динамическое вычисление размера для корректного преобразования формы
         q1 = self.linear_one(hidden)
         print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
-        batch_size, seq_len, _ = q1.size()
-        q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)  # Используем явное вычисление для размера
+        batch_size, seq_len, _ = q1.size()  # Получаем текущие размеры
+        num_elements = q1.numel()
+        q1 = q1.view(batch_size, seq_len,
+                     self.hidden_size // self.heads)  # Используем правильное вычисление для последней оси
+        num_elements_after = q1.numel()
+
+        # Проверяем количество элементов перед и после изменения формы
+        print(f"--- Debugging --- num_elements before reshape: {num_elements}")
+        print(f"--- Debugging --- num_elements after reshape: {num_elements_after}")
+        assert num_elements == num_elements_after, "Количество элементов не совпадает после изменения формы!"
 
         q2 = self.linear_two(hidden)
         print(f"--- Debugging --- q2.shape before reshape: {q2.shape}")
-        q2 = q2.view(batch_size, seq_len, self.hidden_size // self.heads)
+        q2 = q2.view(batch_size, seq_len, self.hidden_size // self.heads)  # Применяем тот же подход для q2
 
         # Проверяем формы после преобразования
         print(f"--- Debugging --- q0.shape: {q0.shape}")
