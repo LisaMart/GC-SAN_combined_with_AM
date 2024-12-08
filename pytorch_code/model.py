@@ -215,15 +215,14 @@ class LastAttenion(nn.Module):
         q1 = self.linear_one(hidden)
         print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
         batch_size, seq_len, _ = q1.size()  # Получаем текущие размеры
-        num_elements = q1.numel()
+
+        # Проверяем, что размерность корректна
+        if self.hidden_size % self.heads != 0:
+            raise ValueError("hidden_size должно делиться на количество голов!")
+
+        # Преобразуем форму
         q1 = q1.view(batch_size, seq_len,
                      self.hidden_size // self.heads)  # Используем правильное вычисление для последней оси
-        num_elements_after = q1.numel()
-
-        # Проверяем количество элементов перед и после изменения формы
-        print(f"--- Debugging --- num_elements before reshape: {num_elements}")
-        print(f"--- Debugging --- num_elements after reshape: {num_elements_after}")
-        assert num_elements == num_elements_after, "Количество элементов не совпадает после изменения формы!"
 
         q2 = self.linear_two(hidden)
         print(f"--- Debugging --- q2.shape before reshape: {q2.shape}")
