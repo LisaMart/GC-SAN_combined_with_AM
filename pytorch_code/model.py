@@ -215,19 +215,16 @@ class LastAttenion(nn.Module):
         q1 = self.linear_one(hidden)
         batch_size, seq_len, _ = q1.size()  # Получаем текущие размеры
         print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
-        print(f"Total elements before reshape || До преобразования: {q1.numel()}")
 
-        # Здесь мы делим на количество голов (heads) и получаем нужную размерность
-        #q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)  # Делим по головам
-        q1 = q1.reshape(batch_size, seq_len, self.hidden_size // self.heads)
-        print(f"Total elements after reshape || После преобразования: {batch_size * seq_len * (self.hidden_size // self.heads)}")
+        # Делим по головам
+        q1 = q1.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)
+        q1 = q1.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, self.hidden_size)
 
         # Для q2
         q2 = self.linear_two(hidden)
         print(f"--- Debugging --- q2.shape before reshape: {q2.shape}")
-        #q2 = q2.view(batch_size, seq_len, self.hidden_size // self.heads)  # Применяем тот же подход для q2
-        q2 = q2.reshape(batch_size, seq_len, self.hidden_size // self.heads)
-
+        q2 = q2.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)
+        q2 = q2.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, self.hidden_size)
 
         # Проверяем формы после преобразования
         print(f"--- Debugging --- q0.shape: {q0.shape}")
