@@ -217,12 +217,15 @@ class LastAttenion(nn.Module):
         print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
 
         # Здесь мы делим на количество голов (heads) и получаем нужную размерность
-        q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)  # Делим по головам
+        #q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)  # Делим по головам
+        q1 = q1.reshape(batch_size, seq_len, self.hidden_size // self.heads)
 
         # Для q2
         q2 = self.linear_two(hidden)
         print(f"--- Debugging --- q2.shape before reshape: {q2.shape}")
-        q2 = q2.view(batch_size, seq_len, self.hidden_size // self.heads)  # Применяем тот же подход для q2
+        #q2 = q2.view(batch_size, seq_len, self.hidden_size // self.heads)  # Применяем тот же подход для q2
+        q2 = q2.reshape(batch_size, seq_len, self.hidden_size // self.heads)
+
 
         # Проверяем формы после преобразования
         print(f"--- Debugging --- q0.shape: {q0.shape}")
