@@ -215,10 +215,12 @@ class LastAttenion(nn.Module):
         q1 = self.linear_one(hidden)
         batch_size, seq_len, _ = q1.size()  # Получаем текущие размеры
         print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
+        print(f"Total elements before reshape || До преобразования: {q1.numel()}")
 
         # Здесь мы делим на количество голов (heads) и получаем нужную размерность
         #q1 = q1.view(batch_size, seq_len, self.hidden_size // self.heads)  # Делим по головам
         q1 = q1.reshape(batch_size, seq_len, self.hidden_size // self.heads)
+        print(f"Total elements after reshape || После преобразования: {batch_size * seq_len * (self.hidden_size // self.heads)}")
 
         # Для q2
         q2 = self.linear_two(hidden)
@@ -340,7 +342,7 @@ def forward(model, i, data):
 
     # Получаем скрытые состояния с помощью GNN
     hidden = model(items, A)
-    print(f"Shape of hidden: {hidden.shape}")  # Выводим форму тензора DEBUGGING STRING
+    print(f"--- Debugging --- Shape of hidden: {hidden.shape}")  # Выводим форму тензора DEBUGGING STRING
 
     # Получаем внимание с помощью LastAttention
     get = lambda i: hidden[i][alias_inputs[i]]
