@@ -208,28 +208,28 @@ class LastAttenion(nn.Module):
 
         batch_size, seq_len, _ = hidden.size()  # Получаем размерности batch и seq_len
 
-        # Линейные преобразования для создания запросов, ключей и значений
-        q0 = self.linear_zero(ht1)
-        print(f"--- Debugging --- q0.shape before view: {q0.shape}")  # Проверьте размер
-        q0 = q0.view(batch_size, -1, self.hidden_size // self.heads)
+        # Для q0
+        q0 = self.linear_zero(ht1)  # (batch_size, 1, hidden_size)
+        q0 = q0.view(batch_size, 1, self.hidden_size // self.heads)
 
+        # Для q1
         q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
         batch_size, seq_len, _ = q1.size()
-        q1 = q1.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
+        q1 = q1.view(batch_size, seq_len, self.heads,
+                     self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q1 = q1.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
+        # Для q2
         q2 = self.linear_two(hidden)  # (batch_size, seq_len, hidden_size)
-        q2 = q2.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
+        q2 = q2.view(batch_size, seq_len, self.heads,
+                     self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Проверяем формы после преобразования
-        print(f"--- Debugging --- q0.shape: {q0.shape}")
-        print(f"--- Debugging --- q1.shape: {q1.shape}")
-        print(f"--- Debugging --- q2.shape: {q2.shape}")
+        # Теперь используем q0 и q1 для матричного умножения
+        q0 = q0.expand(-1, seq_len, -1)  # Преобразуем q0 в (batch_size, seq_len, hidden_size // heads)
 
-        # 1. Вычисление alpha через матричное умножение
-        # q1.permute(0, 2, 1) => (batch_size, heads, seq_len, hidden_size // heads) -> (batch_size, seq_len, heads, hidden_size // heads)
-        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 1)))  # (batch_size, seq_len, seq_len)
+        # Вычисляем alpha
+        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 3, 2, 1)))  # (batch_size, seq_len, seq_len)
         print(f"--- Debugging --- alpha.shape: {alpha.shape}")
 
         # 2. Перераспределение alpha для softmax
