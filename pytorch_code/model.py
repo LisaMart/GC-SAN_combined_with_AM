@@ -265,11 +265,17 @@ class LastAttenion(nn.Module):
 
         # Маскируем alpha, если маска присутствует
         if mask is not None:
+            # Маска с размером [batch_size, seq_len] будет расширена до [batch_size, heads, seq_len]
             mask = mask.unsqueeze(1).expand(-1, self.heads, -1)  # (batch_size, heads, seq_len)
+
+            # Убедитесь, что размерности совпадают
+            print(f"--- Debugging --- mask.shape: {mask.shape}")
+
+            # Маскируем alpha
             alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
 
-        # Применяем softmax после маскировки
-        alpha = torch.softmax(2 * alpha, dim=1)
+            # Перерасчитываем softmax после маскировки
+            alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
         # Матричное умножение alpha и q2
         attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
