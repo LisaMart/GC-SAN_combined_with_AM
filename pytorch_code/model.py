@@ -268,14 +268,18 @@ class LastAttenion(nn.Module):
             # Маска с размером [batch_size, seq_len] будет расширена до [batch_size, heads, seq_len]
             mask = mask.unsqueeze(1).expand(-1, self.heads, -1)  # (batch_size, heads, seq_len)
 
+            # Маску также нужно привести к размерности [batch_size, heads, seq_len, seq_len] для правильного умножения
+            mask = mask.unsqueeze(-1).expand(-1, -1, -1, seq_len)  # (batch_size, heads, seq_len, seq_len)
+
             # Убедитесь, что размерности совпадают
             print(f"--- Debugging --- mask.shape: {mask.shape}")
+            print(f"--- Debugging --- alpha.shape before mask: {alpha.shape}")
 
-            # Маскируем alpha, добавляем ось для heads
-            alpha = torch.masked_fill(alpha, ~mask.unsqueeze(-1).bool(), float('-inf'))  # Маскируем по последней оси
+            # Маскируем alpha
+            alpha = torch.masked_fill(alpha, ~mask.bool(), float('-inf'))  # Маскируем по последней оси
 
             # Перерасчитываем softmax после маскировки
-            alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
+            alpha = torch.softmax(2 * alpha, dim=3)  # Перерасчитываем softmax по последней оси
 
         # Матричное умножение alpha и q2
         attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
@@ -292,7 +296,6 @@ class LastAttenion(nn.Module):
         print(f"--- Debugging --- output a.shape: {a.shape}")
 
         return a, alpha
-
 
 class SessionGraph(Module):
     def __init__(self, opt, n_node, len_max):
