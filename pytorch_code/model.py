@@ -212,7 +212,7 @@ class LastAttenion(nn.Module):
         q0 = self.linear_zero(ht1)  # (batch_size, hidden_size)
         q0 = q0.view(batch_size, 1, self.hidden_size)  # (batch_size, 1, hidden_size)
 
-        # Теперь мы расширяем q0 для seq_len
+        # Теперь расширяем q0 для seq_len
         q0 = q0.expand(-1, seq_len, -1)  # (batch_size, seq_len, hidden_size)
 
         # Для q1
@@ -228,7 +228,10 @@ class LastAttenion(nn.Module):
                      self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Теперь мы вычисляем alpha, приводя размерности q0 и q1 к совместимым для умножения
+        # Преобразуем q0 для матричного умножения
+        q0 = q0.view(batch_size, 1, seq_len, self.hidden_size)
+
+        # Вычисляем alpha
         alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 3, 1)))  # (batch_size, seq_len, seq_len)
 
         print(f"--- Debugging --- q0.shape: {q0.shape}")
