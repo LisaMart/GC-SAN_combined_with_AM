@@ -258,8 +258,6 @@ class LastAttenion(nn.Module):
         # 4. Применение alpha к q2
         q2 = q2.view(batch_size, self.heads, seq_len,
                      self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
-
-        # 4.1. Приводим q2 к совместимой форме с alpha
         attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
         print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
 
