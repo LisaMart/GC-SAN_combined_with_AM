@@ -192,90 +192,84 @@ class LastAttenion(nn.Module):
         for weight in self.parameters():
             weight.data.normal_(std=0.1)
 
-    def forward(self, ht1, hidden, mask):
-        """
-        Механизм внимания, основанный на scaled dot-product attention.
+def forward(self, ht1, hidden, mask):
+    """
+    Механизм внимания, основанный на scaled dot-product attention.
 
-        :param ht1: Текущий скрытый запрос (batch_size, 1, hidden_size)
-        :param hidden: Скрытые состояния (batch_size, seq_len, hidden_size)
-        :param mask: Маска для значений (batch_size, seq_len) для скрытия определённых значений
-        :return: Обработанное внимание
-        """
+    :param ht1: Текущий скрытый запрос (batch_size, 1, hidden_size)
+    :param hidden: Скрытые состояния (batch_size, seq_len, hidden_size)
+    :param mask: Маска для значений (batch_size, seq_len) для скрытия определённых значений
+    :return: Обработанное внимание
+    """
+    print(f"--- Debugging --- ht1.shape: {ht1.shape}")
+    print(f"--- Debugging --- hidden.shape: {hidden.shape}")
+    print(f"--- Debugging --- mask.shape: {mask.shape}")
 
-        print(f"--- Debugging --- ht1.shape: {ht1.shape}")
-        print(f"--- Debugging --- hidden.shape: {hidden.shape}")
-        print(f"--- Debugging --- mask.shape: {mask.shape}")
+    batch_size, seq_len, _ = hidden.size()  # Получаем размерности batch и seq_len
 
-        batch_size, seq_len, _ = hidden.size()  # Получаем размерности batch и seq_len
+    # Для q0
+    q0 = self.linear_zero(ht1)  # (batch_size, hidden_size)
+    q0 = q0.reshape(batch_size, self.heads, self.hidden_size // self.heads)  # (batch_size, heads, hidden_size // heads)
 
-        # Для q0
-        q0 = self.linear_zero(ht1)  # (batch_size, hidden_size)
-        q0 = q0.reshape(batch_size, self.heads,
-                        self.hidden_size // self.heads)  # (batch_size, heads, hidden_size // heads)
+    # Преобразуем q0 в [batch_size, heads, seq_len, hidden_size // heads]
+    q0 = q0.unsqueeze(2).expand(-1, -1, seq_len, -1)  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Преобразуем q0 в [batch_size, heads, seq_len, hidden_size // heads]
-        q0 = q0.unsqueeze(2).expand(-1, -1, seq_len, -1)  # (batch_size, heads, seq_len, hidden_size // heads)
+    # Для q1
+    q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
+    q1 = q1.reshape(batch_size, seq_len, self.heads, self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
+    q1 = q1.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Для q1
-        q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
-        q1 = q1.reshape(batch_size, seq_len, self.heads,
-                        self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
-        q1 = q1.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
+    # Для q2
+    q2 = self.linear_two(hidden)  # (batch_size, seq_len, hidden_size)
+    q2 = q2.reshape(batch_size, seq_len, self.heads, self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
+    q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Для q2
-        q2 = self.linear_two(hidden)  # (batch_size, seq_len, hidden_size)
-        q2 = q2.reshape(batch_size, seq_len, self.heads,
-                        self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
-        q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
+    # Отладочные выводы для проверок
+    print(f"--- Debugging --- q0.shape: {q0.shape}")
+    print(f"--- Debugging --- q1.shape: {q1.shape}")
+    print(f"--- Debugging --- q2.shape: {q2.shape}")
 
-        # Отладочные выводы для проверок
-        print(f"--- Debugging --- q0.shape: {q0.shape}")
-        print(f"--- Debugging --- q1.shape: {q1.shape}")
-        print(f"--- Debugging --- q2.shape: {q2.shape}")
+    # 1. Теперь можем использовать q0 и q1 для матричного умножения
+    alpha = torch.sigmoid(torch.matmul(q0, q1.transpose(-1, -2)))  # (batch_size, heads, seq_len, seq_len)
+    print(f"--- Debugging --- alpha.shape: {alpha.shape}")
 
-        # 1. Теперь можем использовать q0 и q1 для матричного умножения
-        alpha = torch.sigmoid(torch.matmul(q0, q1.transpose(-1, -2)))  # (batch_size, heads, seq_len, seq_len)
-        print(f"--- Debugging --- alpha.shape: {alpha.shape}")
+    # 2. Перераспределяем alpha для softmax
+    alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)  # (batch_size, heads, seq_len, seq_len)
 
-        # 2. Перераспределяем alpha для softmax
-        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)  # (batch_size, heads, seq_len, seq_len)
+    # 3. Применение softmax для получения весов внимания
+    alpha = torch.softmax(alpha, dim=-1)  # Применяем softmax по последней оси (по ключам)
+    print(f"--- Debugging --- alpha.shape after softmax: {alpha.shape}")
 
-        # 3. Применение softmax для получения весов внимания
-        alpha = torch.softmax(alpha, dim=-1)  # Применяем softmax по последней оси (по ключам)
-        print(f"--- Debugging --- alpha.shape after softmax: {alpha.shape}")
+    # Применяем маску, если она есть
+    if mask is not None:
+        # Маскируем alpha, добавляем ось для heads в mask
+        mask = mask.unsqueeze(1)  # (batch_size, 1, seq_len)
+        mask = mask.expand(-1, self.heads, -1)  # (batch_size, heads, seq_len)
 
-        # Применяем маску, если она есть
-        if mask is not None:
-            # Маскируем alpha, добавляем ось для heads в mask
-            mask = mask.unsqueeze(1)  # (batch_size, 1, seq_len)
-            mask = mask.expand(-1, self.heads, -1)  # (batch_size, heads, seq_len)
+        # Маскируем alpha
+        alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
 
-            # Маскируем alpha
-            alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
+        # Перерасчитываем softmax после маскировки
+        alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
-            # Перерасчитываем softmax после маскировки
-            alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
+    # 4. Применение alpha к q2
+    q2 = q2.view(batch_size, self.heads, seq_len, self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
+    attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # 4. Применение alpha к q2
-        # Для корректного умножения alpha на q2 нам нужно согласовать размерности
-        q2 = q2.view(batch_size, self.heads, seq_len,
-                     self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
-        attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
+    print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
 
-        print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
+    # Применяем Dropout
+    alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
-        # Применяем Dropout
-        alpha = F.dropout(alpha, p=self.dropout, training=self.training)
+    # Вычисляем итоговое значение с использованием значений (v)
+    a = torch.sum(
+        (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
+            hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
+    )
 
-        # Вычисляем итоговое значение с использованием значений (v)
-        a = torch.sum(
-            (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
-                hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
-        )
-
-        print(f"--- Debugging --- output a.shape: {a.shape}")
-        # Возвращаем итоговое внимание и веса
-        return a, alpha
+    print(f"--- Debugging --- output a.shape: {a.shape}")
+    # Возвращаем итоговое внимание и веса
+    return a, alpha
 
 class SessionGraph(Module):
     def __init__(self, opt, n_node, len_max):
