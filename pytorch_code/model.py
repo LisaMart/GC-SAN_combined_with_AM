@@ -212,7 +212,7 @@ class LastAttenion(nn.Module):
         q0 = self.linear_zero(ht1)  # (batch_size, hidden_size)
         q0 = q0.view(batch_size, 1, self.hidden_size // self.heads)  # (batch_size, 1, hidden_size // heads)
 
-        # Вместо view используем expand, чтобы увеличить seq_len
+        # Используем expand, чтобы увеличивать размерность seq_len
         q0 = q0.expand(-1, seq_len, -1)  # Преобразуем q0 в (batch_size, seq_len, hidden_size // heads)
 
         # Для q1
