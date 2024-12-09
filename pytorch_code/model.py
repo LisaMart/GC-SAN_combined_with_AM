@@ -211,7 +211,7 @@ class LastAttenion(nn.Module):
         # Линейные преобразования для создания запросов, ключей и значений
         q0 = self.linear_zero(ht1)
         print(f"--- Debugging --- q0.shape before view: {q0.shape}")  # Проверьте размер
-        q0 = q0.view(batch_size, 1, self.hidden_size // self.heads)
+        q0 = q0.view(batch_size, -1, self.hidden_size // self.heads)
 
         q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
         batch_size, seq_len, _ = q1.size()
