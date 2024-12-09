@@ -256,9 +256,17 @@ class LastAttenion(nn.Module):
             # Перерасчитываем softmax после маскировки
             alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
-        # 4. Применение alpha к q2 через dot product
-        q2 = q2.view(batch_size, self.heads, seq_len, self.hidden_size // self.heads)
-        attn_output = torch.sum(alpha * q2, dim=-1)  # Выполняем dot product по последней оси
+        # Применение alpha к q2 с маскировкой
+        q2 = q2.view(batch_size, self.heads, seq_len,
+                     self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
+
+        # Маскируем q2
+        if mask is not None:
+            mask = mask.unsqueeze(1).expand(-1, self.heads, -1)  # (batch_size, heads, seq_len)
+            q2 = q2 * mask.unsqueeze(-1)  # Применяем маску
+
+        # Матричное умножение
+        attn_output = torch.matmul(alpha, q2)
         print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
 
         # Применяем Dropout
