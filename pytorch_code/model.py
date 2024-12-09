@@ -209,40 +209,40 @@ class LastAttenion(nn.Module):
         batch_size, seq_len, _ = hidden.size()  # Получаем размерности batch и seq_len
 
         # Линейные преобразования для создания запросов, ключей и значений
-        q0 = self.linear_zero(ht1).view(batch_size, -1, self.hidden_size // self.heads)
+        q0 = self.linear_zero(ht1).view(batch_size, -1, self.hidden_size // self.heads)  # (batch_size, 1, 15)
 
         # Для q1
-        q1 = self.linear_one(hidden)
-        batch_size, seq_len, _ = q1.size()  # Получаем текущие размеры
+        q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
+        batch_size, seq_len, _ = q1.size()
         print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
 
-        # Разделяем по головам, используя view
+        # Здесь делим на количество голов (heads), получаем (batch_size, seq_len, heads, hidden_size // heads)
         q1 = q1.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)
-        q1 = q1.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len,
-                                                      self.heads * (self.hidden_size // self.heads))
+
+        # Переставляем оси для того, чтобы расположить головы (batch_size, heads, seq_len, hidden_size // heads)
+        q1 = q1.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
         # Для q2
-        q2 = self.linear_two(hidden)
+        q2 = self.linear_two(hidden)  # (batch_size, seq_len, hidden_size)
         print(f"--- Debugging --- q2.shape before reshape: {q2.shape}")
-        q2 = q2.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)
-        q2 = q2.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len,
-                                                      self.heads * (self.hidden_size // self.heads))
+        q2 = q2.view(batch_size, seq_len, self.heads,
+                     self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
+        q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
         # Проверяем формы после преобразования
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
 
-        # Теперь проводим операцию матричного умножения для внимания
-        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 1)))  # (batch_size, seq_len, seq_len)
-
-        # Масштабированное скалярное произведение для вычисления внимания
+        # 1. Вычисление alpha через матричное умножение
         alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 1)))  # (batch_size, seq_len, seq_len)
         print(f"--- Debugging --- alpha.shape: {alpha.shape}")
 
-        # Применяем softmax для получения весов внимания
+        # 2. Перераспределение alpha для softmax
         alpha = alpha.view(-1, q0.size(1) * self.heads, hidden.size(1)).permute(0, 2, 1)
-        alpha = torch.softmax(2 * alpha, dim=1)  # Применяем softmax по последнему измерению (по ключам)
+
+        # 3. Применение softmax для получения весов внимания
+        alpha = torch.softmax(2 * alpha, dim=1) 
 
         # Применяем маску, если она есть
         if mask is not None:
