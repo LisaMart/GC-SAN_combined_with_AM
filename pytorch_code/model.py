@@ -256,6 +256,9 @@ class LastAttenion(nn.Module):
             alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
         # 4. Применение alpha к q2
+        # Проверим размерности до применения матричного умножения
+        print(f"--- Debugging --- alpha.shape BEFORE: {alpha.shape}")
+        print(f"--- Debugging --- q2.shape BEFORE: {q2.shape}")
         # Преобразуем q2 так, чтобы оно совпало с размерностью alpha
         q2 = q2.view(batch_size, self.heads, seq_len, self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
 
