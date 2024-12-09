@@ -209,20 +209,20 @@ class LastAttenion(nn.Module):
         batch_size, seq_len, _ = hidden.size()  # Получаем размерности batch и seq_len
 
         # Для q0
-        q0 = self.linear_zero(ht1)  # (batch_size, 1, hidden_size)
-        q0 = q0.view(batch_size, 1, self.hidden_size // self.heads)
+        q0 = self.linear_zero(ht1)  # (batch_size, hidden_size)
+        q0 = q0.view(batch_size, 1, self.hidden_size // self.heads)  # (batch_size, 1, hidden_size // heads)
+        # Вместо view используем expand
+        q0 = q0.expand(-1, seq_len, -1)  # Преобразуем q0 в (batch_size, seq_len, hidden_size // heads)
 
         # Для q1
         q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
         batch_size, seq_len, _ = q1.size()
-        q1 = q1.view(batch_size, seq_len, self.heads,
-                     self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
+        q1 = q1.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q1 = q1.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
         # Для q2
         q2 = self.linear_two(hidden)  # (batch_size, seq_len, hidden_size)
-        q2 = q2.view(batch_size, seq_len, self.heads,
-                     self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
+        q2 = q2.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
         # Теперь используем q0 и q1 для матричного умножения
