@@ -220,7 +220,7 @@ class LastAttenion(nn.Module):
         q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
         q1 = q1.reshape(batch_size, seq_len, self.heads,
                         self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
-        q1 = q1.permute(0, 2, 3, 1).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
+        q1 = q1.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
         # Для q2
         q2 = self.linear_two(hidden)  # (batch_size, seq_len, hidden_size)
@@ -228,6 +228,7 @@ class LastAttenion(nn.Module):
                         self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
+        # Отладочные выводы для проверок
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
@@ -245,7 +246,14 @@ class LastAttenion(nn.Module):
 
         # Применяем маску, если она есть
         if mask is not None:
+            # Маскируем alpha, добавляем ось для heads в mask
+            mask = mask.unsqueeze(1)  # (batch_size, 1, seq_len)
+            mask = mask.expand(-1, self.heads, -1)  # (batch_size, heads, seq_len)
+
+            # Маскируем alpha
             alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
+
+            # Перерасчитываем softmax после маскировки
             alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
         # Применяем Dropout
