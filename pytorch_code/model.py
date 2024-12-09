@@ -271,8 +271,8 @@ class LastAttenion(nn.Module):
             # Убедитесь, что размерности совпадают
             print(f"--- Debugging --- mask.shape: {mask.shape}")
 
-            # Маскируем alpha
-            alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
+            # Маскируем alpha, добавляем ось для heads
+            alpha = torch.masked_fill(alpha, ~mask.unsqueeze(-1).bool(), float('-inf'))  # Маскируем по последней оси
 
             # Перерасчитываем softmax после маскировки
             alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
@@ -292,6 +292,7 @@ class LastAttenion(nn.Module):
         print(f"--- Debugging --- output a.shape: {a.shape}")
 
         return a, alpha
+
 
 class SessionGraph(Module):
     def __init__(self, opt, n_node, len_max):
