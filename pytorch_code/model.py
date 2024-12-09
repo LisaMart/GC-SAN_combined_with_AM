@@ -218,18 +218,23 @@ class LastAttenion(nn.Module):
 
         # Делим по головам
         q1 = q1.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)
-        q1 = q1.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, self.hidden_size)
+        q1 = q1.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len,
+                                                      self.heads * (self.hidden_size // self.heads))
 
         # Для q2
         q2 = self.linear_two(hidden)
         print(f"--- Debugging --- q2.shape before reshape: {q2.shape}")
         q2 = q2.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)
-        q2 = q2.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, self.hidden_size)
+        q2 = q2.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len,
+                                                      self.heads * (self.hidden_size // self.heads))
 
         # Проверяем формы после преобразования
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
+
+        # Теперь проводим операцию матричного умножения для внимания
+        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 1)))  # (batch_size, seq_len, seq_len)
 
         # Масштабированное скалярное произведение для вычисления внимания
         alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 1)))  # (batch_size, seq_len, seq_len)
