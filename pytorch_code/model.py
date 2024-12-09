@@ -259,12 +259,10 @@ class LastAttenion(nn.Module):
         # 4. Применение alpha к q2
         q2 = q2.view(batch_size, self.heads, seq_len,
                      self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
+        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)  # Согласуем alpha с размерами q2
 
-        # Матричное умножение alpha и q2
-        #attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
-        # print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
-        # Вариант 1 Применение alpha к q2 с транспонированием q2
-        attn_output = torch.matmul(alpha, q2.transpose(-2, -1))  # Транспонируем q2 по последним двум осям
+        # Применение матричного умножения
+        attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
         print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
 
         # Применяем Dropout
