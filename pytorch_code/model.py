@@ -228,15 +228,15 @@ class LastAttenion(nn.Module):
                      self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Преобразуем q0 для матричного умножения
-        q0 = q0.view(batch_size, 1, seq_len, self.hidden_size)
-
-        # Вычисляем alpha
-        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 3, 1)))  # (batch_size, seq_len, seq_len)
+        # Теперь преобразуем q0 в форму для матричного умножения с q1
+        q0 = q0.view(batch_size, 1, seq_len, self.hidden_size)  # (batch_size, 1, seq_len, hidden_size)
 
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
+
+        # Вычисляем alpha
+        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 3, 1)))  # (batch_size, seq_len, seq_len)
         print(f"--- Debugging --- alpha.shape: {alpha.shape}")
 
         # 2. Перераспределение alpha для softmax
