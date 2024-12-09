@@ -213,30 +213,21 @@ class LastAttenion(nn.Module):
         q0 = q0.reshape(batch_size, self.heads,
                         self.hidden_size // self.heads)  # (batch_size, heads, hidden_size // heads)
 
-        # Теперь расширяем q0 для seq_len и преобразуем его в формат [batch_size, heads, seq_len, hidden_size // heads]
+        # Преобразуем q0 в [batch_size, heads, seq_len, hidden_size // heads]
         q0 = q0.unsqueeze(2).expand(-1, -1, seq_len, -1)  # (batch_size, heads, seq_len, hidden_size // heads)
 
         # Для q1
         q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
-        batch_size, seq_len, _ = q1.size()
         q1 = q1.reshape(batch_size, seq_len, self.heads,
                         self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q1 = q1.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
-
-        # Для q2
-        q2 = self.linear_two(hidden)  # (batch_size, seq_len, hidden_size)
-        q2 = q2.reshape(batch_size, seq_len, self.heads,
-                        self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
-        q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
 
         # 1. Теперь можем использовать q0 и q1 для матричного умножения
-        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 3, 1)))  # (batch_size, heads, seq_len, seq_len)
-
-        # Проверяем размерность alpha
+        alpha = torch.sigmoid(torch.matmul(q0, q1.transpose(-1, -2)))  # (batch_size, heads, seq_len, seq_len)
         print(f"--- Debugging --- alpha.shape: {alpha.shape}")
 
         # 2. Перераспределяем alpha для softmax
