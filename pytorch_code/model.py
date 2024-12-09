@@ -228,12 +228,13 @@ class LastAttenion(nn.Module):
                      self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # 1. Вычисляем alpha
-        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 3, 2, 1)))  # (batch_size, seq_len, seq_len)
+        # Теперь мы вычисляем alpha, приводя размерности q0 и q1 к совместимым для умножения
+        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 3, 1)))  # (batch_size, seq_len, seq_len)
 
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
+        print(f"--- Debugging --- alpha.shape: {alpha.shape}")
 
         # 2. Перераспределение alpha для softmax
         alpha = alpha.view(-1, q0.size(1) * self.heads, hidden.size(1)).permute(0, 2, 1)
