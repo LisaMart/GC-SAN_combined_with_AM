@@ -256,15 +256,23 @@ class LastAttenion(nn.Module):
             # Перерасчитываем softmax после маскировки
             alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
-        # Применение alpha к q2 с транспонированием q2
-        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)
-        q2 = q2.view(batch_size, self.heads, seq_len, self.hidden_size // self.heads)
+        # Применение alpha к q2
+        q2 = q2.view(batch_size, self.heads, seq_len,
+                     self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Транспонируем q2 по нужной оси
-        q2 = q2.permute(0, 1, 3, 2)  # Меняем местами последние две оси для совместимости
+        # Приводим alpha к совместимой форме с q2 для матричного умножения
+        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)  # (batch_size, heads, seq_len, seq_len)
 
-        # Матричное умножение
-        attn_output = torch.matmul(alpha, q2)
+        # Маскируем alpha, если маска присутствует
+        if mask is not None:
+            mask = mask.unsqueeze(1).expand(-1, self.heads, -1)  # (batch_size, heads, seq_len)
+            alpha = torch.masked_fill(alpha, ~mask.bool().unsqueeze(-1), float('-inf'))  # Маскируем
+
+        # Применяем softmax после маскировки
+        alpha = torch.softmax(2 * alpha, dim=1)
+
+        # Матричное умножение alpha и q2
+        attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
         print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
 
         # Применяем Dropout
