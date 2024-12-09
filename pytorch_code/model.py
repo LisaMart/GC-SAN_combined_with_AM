@@ -256,14 +256,12 @@ class LastAttenion(nn.Module):
             # Перерасчитываем softmax после маскировки
             alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
-        # Применение alpha к q2 с маскировкой
-        q2 = q2.view(batch_size, self.heads, seq_len,
-                     self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
+        # Применение alpha к q2 с транспонированием q2
+        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)
+        q2 = q2.view(batch_size, self.heads, seq_len, self.hidden_size // self.heads)
 
-        # Маскируем q2
-        if mask is not None:
-            mask = mask.unsqueeze(1).expand(-1, self.heads, -1)  # (batch_size, heads, seq_len)
-            q2 = q2 * mask.unsqueeze(-1)  # Применяем маску
+        # Транспонируем q2 по нужной оси
+        q2 = q2.permute(0, 1, 3, 2)  # Меняем местами последние две оси для совместимости
 
         # Матричное умножение
         attn_output = torch.matmul(alpha, q2)
