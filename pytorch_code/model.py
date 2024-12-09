@@ -259,22 +259,25 @@ class LastAttenion(nn.Module):
         q2 = q2.view(batch_size, self.heads, seq_len,
                      self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Применяем матричное умножение для alpha и q2
-        attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
+        # Проверим размерности перед матричным умножением
+        print(f"--- Debugging --- alpha.shape before: {alpha.shape}")
+        print(f"--- Debugging --- q2.shape before: {q2.shape}")
 
-        # Проверим размеры после умножения
-        print(f"--- Debugging --- attn_output.shape after matmul: {attn_output.shape}")
+        # Согласуем размерности для матричного умножения
+        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)  # (batch_size, heads, seq_len, seq_len)
+
+        # Применение матричного умножения
+        attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
+        print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
 
         # Применяем Dropout
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
-        # Для вычисления итогового значения
+        # Вычисляем итоговое значение с использованием значений (v)
         a = torch.sum(
             (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
                 hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
         )
-
-        # Печатаем итоговый размер
         print(f"--- Debugging --- output a.shape: {a.shape}")
 
         return a, alpha
