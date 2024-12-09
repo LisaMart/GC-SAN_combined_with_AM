@@ -222,6 +222,12 @@ class LastAttenion(nn.Module):
                         self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
         q1 = q1.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
 
+        # Для q2
+        q2 = self.linear_two(hidden)  # (batch_size, seq_len, hidden_size)
+        q2 = q2.reshape(batch_size, seq_len, self.heads,
+                        self.hidden_size // self.heads)  # (batch_size, seq_len, heads, hidden_size // heads)
+        q2 = q2.permute(0, 2, 1, 3).contiguous()  # (batch_size, heads, seq_len, hidden_size // heads)
+
         print(f"--- Debugging --- q0.shape: {q0.shape}")
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
