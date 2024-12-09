@@ -259,11 +259,7 @@ class LastAttenion(nn.Module):
         q2 = q2.view(batch_size, self.heads, seq_len,
                      self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Проверим размерности перед матричным умножением
-        print(f"--- Debugging --- alpha.shape before: {alpha.shape}")
-        print(f"--- Debugging --- q2.shape before: {q2.shape}")
-
-        # Согласуем размерности для матричного умножения
+        # Согласование размерности alpha для матричного умножения с q2
         alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)  # (batch_size, heads, seq_len, seq_len)
 
         # Применение матричного умножения
