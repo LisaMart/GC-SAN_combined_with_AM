@@ -258,17 +258,21 @@ class LastAttenion(nn.Module):
         # 4. Применение alpha к q2
         q2 = q2.view(batch_size, self.heads, seq_len,
                      self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
-        attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
-        print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
 
-        # Применяем Dropout
+        print(f"--- Debugging --- q2 shape BEFORE matmul: {q2.shape}")
+        print(f"--- Debugging --- alpha shape BEFORE matmul: {alpha.shape}")
+
+        attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
+        print(f"--- Debugging --- attn_output.shape after matmul: {attn_output.shape}")
+
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
-        # Вычисляем итоговое значение
+        # Для итогового результата, корректируем размерности для совместимости
         a = torch.sum(
             (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
                 hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
         )
+
         print(f"--- Debugging --- output a.shape: {a.shape}")
 
         return a, alpha
