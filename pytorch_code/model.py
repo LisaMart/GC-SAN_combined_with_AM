@@ -233,19 +233,16 @@ class LastAttenion(nn.Module):
         print(f"--- Debugging --- q1.shape: {q1.shape}")
         print(f"--- Debugging --- q2.shape: {q2.shape}")
 
-        # Теперь корректируем матричное умножение
-        # q0 имеет форму (batch_size, heads, seq_len, hidden_size // heads)
-        # q1 имеет форму (batch_size, heads, seq_len, hidden_size // heads)
-        # Переставляем q1 так, чтобы мы могли умножить по соответствующим осям
-        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 1, 3, 2)))  # (batch_size, heads, seq_len, seq_len)
+        # 1. Теперь можем использовать q0 и q1 для матричного умножения
+        alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 2, 3, 1)))  # (batch_size, heads, seq_len, seq_len)
+        print(f"--- Debugging --- alpha.shape before reshaping: {alpha.shape}")
 
-        print(f"--- Debugging --- alpha.shape: {alpha.shape}")
+        # 2. Общее количество элементов в alpha должно быть равно тому, что мы ожидаем после reshaping
+        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)  # (batch_size, heads, seq_len, seq_len)
 
-        # 2. Перераспределение alpha для softmax
-        alpha = alpha.view(-1, q0.size(1) * self.heads, hidden.size(1)).permute(0, 2, 1)
-
-        # 3. Применение softmax для получения весов внимания
-        alpha = torch.softmax(2 * alpha, dim=1) 
+        # 3. Применение softmax
+        alpha = torch.softmax(alpha, dim=-1)  # Применяем softmax по последней оси (по ключам)
+        print(f"--- Debugging --- alpha.shape after softmax: {alpha.shape}")
 
         # Применяем маску, если она есть
         if mask is not None:
