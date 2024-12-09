@@ -229,6 +229,11 @@ class LastAttenion(nn.Module):
         # Теперь используем q0 и q1 для матричного умножения
         q0 = q0.expand(-1, seq_len, -1)  # Преобразуем q0 в (batch_size, seq_len, hidden_size // heads)
 
+        # Проверяем формы после преобразования
+        print(f"--- Debugging --- q0.shape: {q0.shape}")
+        print(f"--- Debugging --- q1.shape: {q1.shape}")
+        print(f"--- Debugging --- q2.shape: {q2.shape}")
+
         # Вычисляем alpha
         alpha = torch.sigmoid(torch.matmul(q0, q1.permute(0, 3, 2, 1)))  # (batch_size, seq_len, seq_len)
         print(f"--- Debugging --- alpha.shape: {alpha.shape}")
