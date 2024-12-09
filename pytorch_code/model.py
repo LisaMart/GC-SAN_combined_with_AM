@@ -216,7 +216,7 @@ class LastAttenion(nn.Module):
         batch_size, seq_len, _ = q1.size()  # Получаем текущие размеры
         print(f"--- Debugging --- q1.shape before reshape: {q1.shape}")
 
-        # Делим по головам
+        # Разделяем по головам, используя view
         q1 = q1.view(batch_size, seq_len, self.heads, self.hidden_size // self.heads)
         q1 = q1.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len,
                                                       self.heads * (self.hidden_size // self.heads))
