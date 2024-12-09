@@ -209,8 +209,9 @@ class LastAttenion(nn.Module):
         batch_size, seq_len, _ = hidden.size()  # Получаем размерности batch и seq_len
 
         # Линейные преобразования для создания запросов, ключей и значений
-        q0 = self.linear_zero(ht1).view(batch_size, 1,
-                                        self.hidden_size // self.heads)  # (batch_size, 1, hidden_size // heads)
+        q0 = self.linear_zero(ht1)
+        print(f"--- Debugging --- q0.shape before view: {q0.shape}")  # Проверьте размер
+        q0 = q0.view(batch_size, 1, self.hidden_size // self.heads)
 
         q1 = self.linear_one(hidden)  # (batch_size, seq_len, hidden_size)
         batch_size, seq_len, _ = q1.size()
