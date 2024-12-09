@@ -256,29 +256,18 @@ class LastAttenion(nn.Module):
             # Перерасчитываем softmax после маскировки
             alpha = torch.softmax(2 * alpha, dim=1)  # Перерасчитываем softmax после маскировки
 
-            # 4. Применение alpha к q2
-            # Для корректного умножения alpha на q2 нам нужно согласовать размерности
+        # 4. Применение alpha к q2
         q2 = q2.view(batch_size, self.heads, seq_len,
                      self.hidden_size // self.heads)  # (batch_size, heads, seq_len, hidden_size // heads)
 
-        # Убедимся, что alpha и q2 имеют согласованные размерности
-        alpha = alpha.view(batch_size, self.heads, seq_len, seq_len)  # (batch_size, heads, seq_len, seq_len)
-
-        # Проверяем размерности перед матричным умножением
-        print(f"--- Debugging --- alpha.shape before matmul: {alpha.shape}")
-        print(f"--- Debugging --- q2.shape before matmul: {q2.shape}")
-
-        # Если размерности не совпадают, делаем их одинаковыми
-        assert alpha.size(-1) == q2.size(-2), "Несоответствие размерностей для умножения!"
-
-        # Умножаем alpha на q2
+        # Матричное умножение alpha и q2
         attn_output = torch.matmul(alpha, q2)  # (batch_size, heads, seq_len, hidden_size // heads)
         print(f"--- Debugging --- attn_output.shape: {attn_output.shape}")
 
         # Применяем Dropout
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
-        # Вычисляем итоговое значение с использованием значений (v)
+        # Вычисляем итоговое значение
         a = torch.sum(
             (alpha.unsqueeze(-1) * q2.view(hidden.size(0), -1, self.heads, self.hidden_size // self.heads)).view(
                 hidden.size(0), -1, self.hidden_size) * mask.view(mask.shape[0], -1, 1).float(), 1
