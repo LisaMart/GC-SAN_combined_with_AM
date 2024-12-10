@@ -119,13 +119,15 @@ class MultiHeadedAttention(nn.Module):
 
         scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)  # Compute the attention scores (batch, head, time1, time2)
         if mask is not None:
-            mask = mask.unsqueeze(1).eq(0)  # (batch, 1, time1, time2)
-            print(f"--- Debugging --- Shape of mask after unsqueeze and eq: {mask.shape}")
-            min_value = float(np.finfo(torch.tensor(0, dtype=scores.dtype).numpy().dtype).min)
-            # scores = scores.masked_fill(mask, min_value)
-            self.attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # Apply softmax and mask (batch, head, time1, time2)
+            print(f"--- Debugging --- Shape of scores: {scores.shape}")
+            print(f"--- Debugging --- Shape of mask before expansion: {mask.shape}")
+            mask_expanded = mask.unsqueeze(1).expand(-1, self.h, -1, -1)  # Expand the mask to fit the size of `scores` (batch, head, time1, time2)
+            print(f"--- Debugging --- Shape of mask after expansion: {mask_expanded.shape}")
+            # min_value = float(np.finfo(torch.tensor(0, dtype=scores.dtype).numpy().dtype).min)
+
+            self.attn = torch.softmax(scores, dim=-1).masked_fill(mask == 0, 0.0) # Apply softmax and mask padding values
         else:
-            self.attn = torch.softmax(scores, dim=-1)  # # Apply softmax without mask (batch, head, time1, time2)
+            self.attn = torch.softmax(scores, dim=-1)  # Apply softmax without mask (batch, head, time1, time2)
 
         p_attn = self.dropout(self.attn) # Apply dropout to attention weights
         x = torch.matmul(p_attn, v)  # Apply attention to values (batch, head, time1, d_k)
