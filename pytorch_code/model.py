@@ -283,7 +283,6 @@ class SessionGraph(Module):
 
     def compute_scores(self, hidden, mask, self_att=True, residual=True, k_blocks=4):
         ht = hidden[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # batch_size x latent_size
-        mask_self = mask.repeat(1, mask.shape[1]).view(-1, mask.shape[1], mask.shape[1])
 
         # Using MultiHeadedAttention for global relationships
         if self_att:
