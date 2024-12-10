@@ -40,15 +40,13 @@ def main():
     else:
         test_data = pickle.load(open('../datasets/' + opt.dataset + '/test.txt', 'rb'))
 
+    # Initialize the Data objects for both training and test datasets
     train_data = Data(train_data, shuffle=True, opt=opt)
     test_data = Data(test_data, shuffle=False, opt=opt)
 
+    # Set the number of nodes (items) based on the dataset
     if opt.dataset == 'diginetica':
         n_node = 43098
-    elif opt.dataset == 'yoochoose1_64' or opt.dataset == 'yoochoose1_4':
-        n_node = 37484
-    elif opt.dataset == 'diginetica_users':
-        n_node = 57070
     else:
         n_node = 310
 
@@ -58,11 +56,12 @@ def main():
     best_result = [0, 0]
     best_epoch = [0, 0]
     bad_counter = 0
+    # Training loop over the specified number of epochs
     for epoch in range(opt.epoch):
         print('-------------------------------------------------------')
         print(f'epoch:  {epoch}/{opt.epoch-1}')
         precision_at_k_mean, mrr_mean = train_test(model, train_data, test_data)
-        flag = 0
+        flag = 0 # Flag to indicate if we got a new best result
         if precision_at_k_mean >= best_result[0]:
             best_result[0] = precision_at_k_mean
             best_epoch[0] = epoch
