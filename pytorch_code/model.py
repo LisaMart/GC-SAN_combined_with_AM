@@ -268,7 +268,7 @@ class SessionGraph(Module):
         self.linear_three = nn.Linear(self.hidden_size, 1, bias=False)  # Linear layer for computing attention scores
         self.linear_transform = nn.Linear(self.hidden_size * 2, self.hidden_size, bias=True)  # Linear layer to transform combined hidden states
         self.rn = Residual()  # Residual block for enhanced feature learning
-        self.multihead_attn = nn.MultiheadAttention(self.hidden_size, 1).cuda()  # Multihead attention layer for learning dependencies
+        self.multihead_attn = MultiHeadedAttention(n_head=opt.heads, n_feat=self.hidden_size, dropout_rate=0.1)  # MultiHeadedAttention layer
         self.pe = PositionEmbedding(len_max, self.hidden_size)  # Position embedding to capture sequence order
         self.loss_function = nn.CrossEntropyLoss()  # Loss function (cross-entropy for classification tasks)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr, weight_decay=opt.l2)  # Adam optimizer
@@ -279,25 +279,27 @@ class SessionGraph(Module):
     def reset_parameters(self):
         stdv = 1.0 / math.sqrt(self.hidden_size)
         for weight in self.parameters():
-            weight.data.uniform_(-stdv, stdv) # Initialize weights using uniform distribution
+            weight.data.uniform_(-stdv, stdv)  # Initialize weights using uniform distribution
 
     def compute_scores(self, hidden, mask, self_att=True, residual=True, k_blocks=4):
-        ht = hidden[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  #  # Get the last hidden state based on mask batch_size x latent_size
-        mask_self = mask.repeat(1, mask.shape[1]).view(-1, mask.shape[1], mask.shape[1]) # Repeat mask for attention calculation
+        ht = hidden[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # batch_size x latent_size
+        mask_self = mask.repeat(1, mask.shape[1]).view(-1, mask.shape[1], mask.shape[1])
 
+        # Using MultiHeadedAttention for global relationships
         if self_att:
-            # Use LastAttention to calculate attention weights and aggregate hidden states
-            attn_output, attn_weights = self.last_attention(ht, hidden, mask)
-            hn = attn_output[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # Use last attention output as global interest
-            a = 0.52 * hn + (1 - 0.52) * ht  # Combine hidden states using a weighted sum
+            attn_output_multihead = self.multihead_attn(ht, hidden, hidden, mask)  # (batch, time1, d_model)
+            hn_multihead = attn_output_multihead[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # last hidden state after attention
+            a_multihead = 0.52 * hn_multihead + (1 - 0.52) * ht  # combine multihead attention output with original hidden state
         else:
-            # Old attention method (if necessary)
-            q1 = self.linear_one(ht).view(ht.shape[0], 1, ht.shape[1])  # batch_size x 1 x latent_size
-            q2 = self.linear_two(hidden)  # batch_size x seq_length x latent_size
-            alpha = self.linear_three(torch.sigmoid(q1 + q2))
-            a = torch.sum(alpha * hidden * mask.view(mask.shape[0], -1, 1).float(), 1)
-            if not self.nonhybrid:
-                a = self.linear_transform(torch.cat([a, ht], 1))  # Transform the combined hidden state
+            a_multihead = ht  # Use the hidden state as is if no self-attention
+
+        # Using LastAttention for recent interactions
+        attn_output_last, attn_weights = self.last_attention(ht, hidden, mask)  # Attention focused on recent actions
+        hn_last = attn_output_last[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # last attention output
+        a_last = 0.52 * hn_last + (1 - 0.52) * ht  # Combine with the original hidden state
+
+        # Combine results from both attention mechanisms (MultiHeadedAttention and LastAttention)
+        a = a_multihead + a_last  # You can experiment with different ways to combine them (e.g., summing, concatenating)
 
         b = self.embedding.weight[1:]  # n_nodes x latent_size (excluding padding)
         scores = torch.matmul(a, b.transpose(1, 0))  # Compute scores by matrix multiplication
@@ -308,6 +310,7 @@ class SessionGraph(Module):
         hidden = self.gnn(A, hidden)  # Apply GNN to propagate features across the graph
         print(f"--- Debugging --- Shape of hidden after GNN: {hidden.shape}")
         return hidden
+
 def trans_to_cuda(variable):
     """Move tensor to GPU if available, otherwise return the tensor as is."""
     if torch.cuda.is_available():
@@ -321,7 +324,6 @@ def trans_to_cpu(variable):
         return variable.cpu()
     else:
         return variable
-
 
 def forward(model, i, data):
     """Forward pass for training or testing."""
